@@ -209,6 +209,27 @@ func CORS(allowedOrigins string, next http.Handler) http.Handler {
 	})
 }
 
+// SecurityHeaders adiciona cabeçalhos de segurança nas respostas servidas
+// pelo próprio Go (o painel embutido em webui). O frontend hospedado no
+// Firebase já recebe headers equivalentes via firebase.json; este middleware
+// cobre o caso do Go servindo o painel direto (localhost ou no Render).
+//
+// A CSP usa connect-src 'self' porque, quando o Go serve o painel, o config.js
+// deixa API_BASE vazio e o fetch vai pra mesma origem.
+func SecurityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; base-uri 'self'; object-src 'none'; " +
+		"frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; " +
+		"style-src 'self'; script-src 'self'; connect-src 'self'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Content-Security-Policy", csp)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // toResponse converte um *store.Link (modelo interno) pro formato de
 // resposta JSON, já montando a URL curta completa.
 func toResponse(link *store.Link, r *http.Request) linkResponse {

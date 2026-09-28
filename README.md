@@ -12,6 +12,14 @@ bloquear as requisições).
 
 ![painel do gopher-links](docs/painel.png)
 
+## No ar
+
+- **Painel:** https://gopherlinks.web.app — frontend estático no Firebase Hosting
+- **API:** https://gopher-links.onrender.com — backend Go no Render, com Postgres
+
+O deploy é contínuo: cada push na `main` publica o frontend no Firebase e
+reconstrói o backend no Render automaticamente (ver `.github/workflows/`).
+
 ## Como funciona
 
 - `POST /api/shorten` cria o link e responde na hora, com status
@@ -22,10 +30,11 @@ bloquear as requisições).
 - O resultado (`healthy` / `unhealthy`) é gravado de volta no store, e o
   painel visual (`GET /`) fica consultando `GET /api/links` a cada 2
   segundos pra mostrar a atualização sem precisar dar F5.
-- O armazenamento (`internal/store`) é em memória, mas fica atrás de uma
-  interface (`Store`). Se eu quiser trocar por Postgres depois, só preciso
-  implementar a mesma interface — os handlers nem o worker pool precisam
-  mudar.
+- O armazenamento (`internal/store`) fica atrás de uma interface (`Store`),
+  com duas implementações: **em memória** (padrão, ótima pra dev e testes) e
+  **Postgres** (`PostgresStore`, usada quando `DATABASE_URL` está definida —
+  aí os links persistem entre reinícios). Os handlers e o worker pool
+  dependem só da interface, então não mudam ao trocar de uma pra outra.
 
 ## Rotas
 
@@ -63,13 +72,14 @@ Depois é só abrir `http://localhost:8080` no navegador.
 
 ```
 cmd/server/           # main() — sobe o servidor e desliga tudo direito no Ctrl+C
-internal/store/        # interface Store + implementação em memória (com mutex)
+internal/store/        # interface Store + implementações: memória e Postgres (pgx)
 internal/worker/       # worker pool das checagens de saúde assíncronas
-internal/handlers/      # handlers HTTP + middleware de CORS, dependem da interface Store
+internal/handlers/      # handlers HTTP + middlewares (CORS, headers de segurança)
 internal/webui/         # painel visual (HTML/CSS/JS embutido no binário)
 firebase/              # cópia estática do painel + config do Firebase Hosting
 Dockerfile             # build do backend pra rodar em Cloud Run / Render / etc.
 render.yaml            # blueprint pra deploy no Render em um clique
+.github/workflows/     # CI/CD: deploy do frontend, keep-warm, testes Go, secret-scan
 DEPLOY.md              # passo a passo geral: frontend no Firebase + backend grátis
 CLOUDRUN.md            # deploy do backend no Google Cloud Run (contínuo via GitHub)
 ```
@@ -87,11 +97,12 @@ está em [DEPLOY.md](DEPLOY.md), e o deploy do backend no Google Cloud Run
 
 | Variável         | Padrão   | Pra que serve                                       |
 |------------------|----------|------------------------------------------------------|
-| `PORT`           | `8080`   | porta do servidor (os hosts grátis injetam isso)     |
-| `ALLOWED_ORIGIN` | `*`      | origem liberada no CORS (o domínio do Firebase)      |
+| `PORT`           | `8080`   | porta do servidor (os hosts grátis injetam isso)                  |
+| `ALLOWED_ORIGIN` | `*`      | origem(ns) liberada(s) no CORS; aceita lista separada por vírgula |
+| `DATABASE_URL`   | *(vazio)* | connection string do Postgres; sem ela, usa store em memória     |
 
 ## Próximos passos (se eu continuar isso depois)
 
-- trocar `MemoryStore` por uma implementação com Postgres/SQLite
 - rate limiting no `/api/shorten`
 - expirar links antigos
+- código curto personalizado (alias escolhido pelo usuário)

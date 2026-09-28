@@ -229,6 +229,11 @@ a.short-link:hover {
   color: var(--accent);
 }
 
+.copy-btn.copied {
+  border-color: var(--green);
+  color: var(--green);
+}
+
 footer {
   text-align: center;
   margin-top: 8px;

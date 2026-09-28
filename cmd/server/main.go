@@ -75,7 +75,7 @@ func run() error {
 	// valores são folgados o suficiente pra uso normal desta API.
 	srv := &http.Server{
 		Addr:              ":" + envOr("PORT", "8080"),
-		Handler:           handlers.CORS(allowedOrigin, h.Routes()),
+		Handler:           handlers.SecurityHeaders(handlers.CORS(allowedOrigin, h.Routes())),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

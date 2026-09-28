@@ -94,7 +94,7 @@ function renderLinks(links) {
 
   // liga os botões de copiar depois de recriar o HTML
   linksBody.querySelectorAll(".copy-btn").forEach((btn) => {
-    btn.addEventListener("click", () => copyToClipboard(btn.dataset.url));
+    btn.addEventListener("click", () => copyToClipboard(btn.dataset.url, btn));
   });
 }
 
@@ -127,10 +127,25 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).catch(() => {
-    /* clipboard pode falhar em contexto não-https; sem problema, ignora */
-  });
+function copyToClipboard(text, btn) {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => showCopied(btn))
+    .catch(() => {
+      /* clipboard pode falhar em contexto não-https; sem problema, ignora */
+    });
+}
+
+// troca o texto do botão por "copiado!" por um instante, como feedback visual.
+function showCopied(btn) {
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.textContent = "copiado!";
+  btn.classList.add("copied");
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.classList.remove("copied");
+  }, 1500);
 }
 
 function setConnStatus(ok) {
