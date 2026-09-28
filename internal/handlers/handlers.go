@@ -80,6 +80,11 @@ type linkResponse struct {
 // Shorten trata o POST /api/shorten: valida a URL recebida, cria o link e
 // dispara a checagem de saúde no worker pool sem esperar ela terminar.
 func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
+	// o corpo esperado é um JSON minúsculo ({"url": "..."}); 4 KiB é de
+	// sobra. Limitar evita que um cliente mande um corpo gigante e faça o
+	// servidor gastar memória à toa.
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+
 	var req shortenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "corpo da requisição inválido (esperado JSON)")
@@ -163,11 +168,32 @@ func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 // Hosting). Sem isso, o navegador bloqueia as chamadas fetch por causa da
 // política de mesma origem (same-origin policy).
 //
-// allowedOrigin é a origem liberada — em produção eu passo o domínio do
-// Firebase; "*" libera qualquer um (útil só pra teste).
-func CORS(allowedOrigin string, next http.Handler) http.Handler {
+// allowedOrigins pode ser "*" (libera qualquer origem — útil só pra teste
+// local) ou uma lista separada por vírgula de origens permitidas, ex.:
+// "https://gopherlinks.web.app,http://localhost:8080". Nesse caso eu ecoo de
+// volta só a origem que veio na requisição, se ela estiver na lista — que é a
+// forma correta de restringir (mandar a lista inteira no header não é válido).
+func CORS(allowedOrigins string, next http.Handler) http.Handler {
+	allowAll := strings.TrimSpace(allowedOrigins) == "*"
+	allowed := make(map[string]bool)
+	if !allowAll {
+		for _, o := range strings.Split(allowedOrigins, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				allowed[o] = true
+			}
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		origin := r.Header.Get("Origin")
+		switch {
+		case allowAll:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		case origin != "" && allowed[origin]:
+			// como a resposta varia conforme a origem, aviso os caches disso.
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
@@ -198,9 +224,16 @@ func toResponse(link *store.Link, r *http.Request) linkResponse {
 // shortURLFor monta a URL curta completa (com esquema e host) a partir da
 // requisição atual, pra funcionar tanto em localhost quanto num domínio
 // de verdade sem precisar configurar nada.
+//
+// Atrás de um proxy que termina o TLS (Render, Cloud Run, etc.) o request que
+// chega ao app é HTTP puro (r.TLS == nil), mas o cliente falou HTTPS. Por isso
+// confio primeiro no header X-Forwarded-Proto que o proxy preenche; sem ele,
+// caio no r.TLS (útil rodando direto, sem proxy).
 func shortURLFor(r *http.Request, code string) string {
 	scheme := "http"
-	if r.TLS != nil {
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	} else if r.TLS != nil {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host + "/" + code

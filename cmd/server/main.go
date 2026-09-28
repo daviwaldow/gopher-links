@@ -48,14 +48,22 @@ func run() error {
 	h := handlers.New(s, pool)
 
 	// Envolvo o roteador com o middleware de CORS pra que o frontend
-	// hospedado no Firebase (outro domínio) consiga chamar a API. A origem
-	// liberada vem da variável de ambiente ALLOWED_ORIGIN; se não vier,
-	// libero geral com "*" (que serve pra rodar/testar localmente).
+	// hospedado no Firebase (outro domínio) consiga chamar a API. As origens
+	// liberadas vêm da variável ALLOWED_ORIGIN — pode ser uma origem, uma
+	// lista separada por vírgula, ou "*". Se não vier, libero geral com "*"
+	// (que serve pra rodar/testar localmente, onde o Go serve tudo junto).
 	allowedOrigin := envOr("ALLOWED_ORIGIN", "*")
 
+	// Timeouts explícitos: sem eles, uma conexão lenta ou maliciosa pode
+	// ficar segurando um socket indefinidamente (ataque tipo slowloris). Os
+	// valores são folgados o suficiente pra uso normal desta API.
 	srv := &http.Server{
-		Addr:    ":" + envOr("PORT", "8080"),
-		Handler: handlers.CORS(allowedOrigin, h.Routes()),
+		Addr:              ":" + envOr("PORT", "8080"),
+		Handler:           handlers.CORS(allowedOrigin, h.Routes()),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// o servidor sobe numa goroutine separada porque ListenAndServe é
