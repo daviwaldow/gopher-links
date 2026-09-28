@@ -201,7 +201,7 @@ func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 
 // Healthz é só um endpoint simples pra saber se o servidor está de pé.
 func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "gopher-links"})
 }
 
 // CORS é um middleware que libera o backend pra ser chamado por um frontend
