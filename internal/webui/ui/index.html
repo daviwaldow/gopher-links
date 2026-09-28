@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gopher-links</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🔗 gopher-links</h1>
+      <p class="subtitle">Encurtador de links em Go, com checagem de saúde assíncrona rodando em background.</p>
+    </header>
+
+    <form id="shorten-form" class="card">
+      <label for="url-input">URL de destino</label>
+      <div class="form-row">
+        <input
+          id="url-input"
+          type="text"
+          placeholder="https://exemplo.com/pagina-bem-longa"
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Encurtar</button>
+      </div>
+      <p id="form-error" class="error hidden"></p>
+    </form>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>Links criados</h2>
+        <span id="link-count" class="badge-count">0</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Link curto</th>
+            <th>Destino</th>
+            <th>Status</th>
+            <th>Cliques</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="links-body">
+          <tr id="empty-row">
+            <td colspan="5" class="empty">Nenhum link ainda. Cria o primeiro ali em cima ☝️</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <span id="conn-status" class="conn-status">conectando...</span>
+    </footer>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

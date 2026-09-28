@@ -1,0 +1,15 @@
+# Blueprint do Render: descreve o serviço pra eu não precisar configurar tudo
+# na mão no painel. Ao conectar o repositório no Render, ele lê esse arquivo e
+# já sobe o backend a partir do Dockerfile.
+services:
+  - type: web
+    name: gopher-links
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      # Depois que o frontend estiver no ar, dá pra trocar "*" pelo domínio
+      # do Firebase (ex: https://seu-projeto.web.app) pra restringir quem
+      # pode chamar a API.
+      - key: ALLOWED_ORIGIN
+        value: "*"
