@@ -4,11 +4,12 @@
 # em serviços gratuitos.
 
 # --- estágio de build ---
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /app
 
-# baixo as dependências primeiro (fica em cache enquanto o go.mod não muda)
-COPY go.mod ./
+# baixo as dependências primeiro (fica em cache enquanto go.mod/go.sum não
+# mudam). Copio o go.sum junto pra o build ser reprodutível (hashes travados).
+COPY go.mod go.sum ./
 RUN go mod download
 
 # copio o resto do código e compilo. CGO desligado pra gerar um binário

@@ -40,7 +40,23 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	s := store.NewMemoryStore()
+	// Escolho o armazenamento pela variável DATABASE_URL: se ela existir, uso
+	// Postgres (os links persistem entre reinícios); senão, caio no store em
+	// memória, que é o suficiente pra rodar/testar localmente. Como os dois
+	// implementam a interface store.Store, o resto do código nem percebe.
+	var s store.Store
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		ps, err := store.NewPostgresStore(ctx, dsn)
+		if err != nil {
+			return err
+		}
+		defer ps.Close()
+		s = ps
+		log.Println("armazenamento: postgres")
+	} else {
+		s = store.NewMemoryStore()
+		log.Println("armazenamento: memória (defina DATABASE_URL pra persistir os links)")
+	}
 
 	pool := worker.NewPool(s, numWorkers, jobQueueSize)
 	pool.Start(ctx)

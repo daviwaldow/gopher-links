@@ -15,3 +15,9 @@ services:
       # sincronizando; senão, ajuste também em Environment no painel do Render.
       - key: ALLOWED_ORIGIN
         value: "https://gopherlinks.web.app"
+      # Connection string do Postgres (ex.: Neon/Supabase). Marcado como
+      # sync:false pra NUNCA ficar no repositório — o valor é colado à mão em
+      # Environment no painel do Render. Sem essa variável, o app usa store em
+      # memória (os links somem a cada reinício).
+      - key: DATABASE_URL
+        sync: false
