@@ -88,7 +88,7 @@ internal/webui/     painel visual (HTML, CSS e JS embutidos no binário)
 firebase/           cópia estática do painel e config do Firebase Hosting
 Dockerfile          build do backend pra rodar em Render, Cloud Run, etc.
 render.yaml         blueprint pra subir no Render
-.github/workflows/  CI/CD: deploy do frontend, keep-warm, testes Go, secret-scan
+.github/workflows/  CI/CD: deploy do frontend e do backend, keep-warm, testes, secret-scan
 DEPLOY.md           passo a passo do frontend no Firebase e backend gratuito
 CLOUDRUN.md         deploy do backend no Google Cloud Run
 ```

@@ -1,0 +1,28 @@
+# Dispara o deploy do backend no Render a cada push na main que mexe no
+# codigo do servidor (ou no Dockerfile/render.yaml). Em vez de depender do
+# webhook nativo do Render, o proprio GitHub Actions chama o Deploy Hook do
+# servico, o que e mais confiavel e fica versionado aqui.
+#
+# Precisa do secret RENDER_DEPLOY_HOOK_URL (Render > servico > Settings >
+# Deploy Hook).
+name: Deploy - API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'render.yaml'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispara o deploy no Render
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
