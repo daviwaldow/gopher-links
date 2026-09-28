@@ -1,11 +1,8 @@
-// ⚠️ TROCAR AQUI antes de fazer o deploy no Firebase.
+// URL pública do backend Go (deploy no Render).
 //
-// Coloque a URL pública do seu backend Go (a que o Render / Cloud Run / etc.
-// te deram depois do deploy). Exemplos:
-//   window.API_BASE = "https://gopher-links.onrender.com";
-//   window.API_BASE = "https://gopher-links-xxxx.run.app";
+// É pra cá que o painel manda as chamadas da API quando está hospedado no
+// Firebase. Se um dia eu trocar o backend de lugar, é só mudar essa linha.
 //
-// Enquanto estiver testando com o backend rodando na sua máquina, dá pra
-// apontar pra localhost:
+// Pra testar com o backend rodando na minha máquina, dá pra apontar pra:
 //   window.API_BASE = "http://localhost:8080";
-window.API_BASE = "http://localhost:8080";
+window.API_BASE = "https://gopher-links.onrender.com";
