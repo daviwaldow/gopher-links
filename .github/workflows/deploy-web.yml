@@ -2,8 +2,9 @@
 # os arquivos estaticos no Firebase Hosting automaticamente. O frontend e
 # estatico (sem build), entao so precisa autenticar e rodar o deploy.
 #
-# Precisa do secret FIREBASE_SERVICE_ACCOUNT no repositorio (JSON da conta
-# de servico com permissao de Firebase Hosting Admin).
+# Precisa do secret FIREBASE_SERVICE_ACCOUNT_GOPHERLINKS no repositorio (JSON
+# da conta de servico com permissao de Firebase Hosting Admin, criado pelo
+# `firebase init hosting:github`).
 name: Deploy - Web
 
 on:
@@ -27,7 +28,7 @@ jobs:
       - name: Autenticar no Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GOPHERLINKS }}
 
       - name: Deploy no Firebase Hosting
         working-directory: firebase
