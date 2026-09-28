@@ -5,6 +5,7 @@
 
 const form = document.getElementById("shorten-form");
 const urlInput = document.getElementById("url-input");
+const aliasInput = document.getElementById("alias-input");
 const formError = document.getElementById("form-error");
 const linksBody = document.getElementById("links-body");
 const linkCount = document.getElementById("link-count");
@@ -27,6 +28,10 @@ form.addEventListener("submit", async (event) => {
   const url = urlInput.value.trim();
   if (!url) return;
 
+  const alias = aliasInput.value.trim();
+  const payload = { url };
+  if (alias) payload.alias = alias;
+
   const submitButton = form.querySelector("button");
   submitButton.disabled = true;
 
@@ -34,7 +39,7 @@ form.addEventListener("submit", async (event) => {
     const res = await fetch(API + "/api/shorten", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
@@ -45,6 +50,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     urlInput.value = "";
+    aliasInput.value = "";
     await refreshLinks();
   } catch (err) {
     showError("falha ao falar com o servidor");

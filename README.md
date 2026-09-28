@@ -35,13 +35,16 @@ reconstrói o backend no Render automaticamente (ver `.github/workflows/`).
   **Postgres** (`PostgresStore`, usada quando `DATABASE_URL` está definida —
   aí os links persistem entre reinícios). Os handlers e o worker pool
   dependem só da interface, então não mudam ao trocar de uma pra outra.
+- Extras: **alias personalizado** (campo `alias` no POST), **expiração** de
+  links por TTL (`LINK_TTL_DAYS`, com limpeza periódica em background) e
+  **rate limiting** por IP no `/api/shorten` (`RATE_LIMIT_PER_MIN`).
 
 ## Rotas
 
 | Método | Rota                  | O que faz                                    |
 |--------|-----------------------|-----------------------------------------------|
 | GET    | `/`                    | painel visual                                 |
-| POST   | `/api/shorten`         | body `{"url": "https://..."}` → cria um link |
+| POST   | `/api/shorten`         | body `{"url":"...","alias":"opcional"}` → cria um link |
 | GET    | `/{code}`              | redireciona (302) pro destino e conta o clique |
 | GET    | `/api/links/{code}`    | metadados de um link específico               |
 | GET    | `/api/links`           | lista todos os links                          |
@@ -97,12 +100,14 @@ está em [DEPLOY.md](DEPLOY.md), e o deploy do backend no Google Cloud Run
 
 | Variável         | Padrão   | Pra que serve                                       |
 |------------------|----------|------------------------------------------------------|
-| `PORT`           | `8080`   | porta do servidor (os hosts grátis injetam isso)                  |
-| `ALLOWED_ORIGIN` | `*`      | origem(ns) liberada(s) no CORS; aceita lista separada por vírgula |
-| `DATABASE_URL`   | *(vazio)* | connection string do Postgres; sem ela, usa store em memória     |
+| `PORT`               | `8080`    | porta do servidor (os hosts grátis injetam isso)                  |
+| `ALLOWED_ORIGIN`     | `*`       | origem(ns) liberada(s) no CORS; aceita lista separada por vírgula |
+| `DATABASE_URL`       | *(vazio)* | connection string do Postgres; sem ela, usa store em memória      |
+| `LINK_TTL_DAYS`      | `0`       | dias até um link expirar (0 = nunca)                              |
+| `RATE_LIMIT_PER_MIN` | `30`      | máximo de links que um mesmo IP cria por minuto (0 = sem limite)  |
 
 ## Próximos passos (se eu continuar isso depois)
 
-- rate limiting no `/api/shorten`
-- expirar links antigos
-- código curto personalizado (alias escolhido pelo usuário)
+- métricas (Prometheus) + dashboard de uso
+- QR code pra cada link curto
+- painel de administração pra listar/remover links

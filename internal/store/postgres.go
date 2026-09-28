@@ -97,6 +97,47 @@ func (s *PostgresStore) Create(destination string) (*Link, error) {
 	return nil, errors.New("store: não consegui gerar um código único")
 }
 
+// CreateWithCode insere um link com um código específico (alias). Se o código
+// já existir, o INSERT viola a chave primária e devolvo ErrCodeTaken.
+func (s *PostgresStore) CreateWithCode(code, destination string) (*Link, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	var createdAt time.Time
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO links (code, destination, status)
+		 VALUES ($1, $2, $3)
+		 RETURNING created_at`,
+		code, destination, string(StatusPending),
+	).Scan(&createdAt)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrCodeTaken
+		}
+		return nil, err
+	}
+
+	return &Link{
+		Code:        code,
+		Destination: destination,
+		CreatedAt:   createdAt,
+		Status:      StatusPending,
+	}, nil
+}
+
+// DeleteExpired remove os links criados antes de cutoff e devolve quantos
+// foram removidos.
+func (s *PostgresStore) DeleteExpired(cutoff time.Time) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	tag, err := s.pool.Exec(ctx, `DELETE FROM links WHERE created_at < $1`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // Get busca um link pelo código; devolve ErrNotFound se não existir.
 func (s *PostgresStore) Get(code string) (*Link, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)

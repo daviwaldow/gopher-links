@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/daviwaldow/gopher-links/internal/store"
 	"github.com/daviwaldow/gopher-links/internal/webui"
@@ -22,14 +23,21 @@ type Handler struct {
 }
 
 type baseDeps struct {
-	store store.Store
-	pool  *worker.Pool
+	store   store.Store
+	pool    *worker.Pool
+	ttl     time.Duration // 0 = links nunca expiram
+	limiter *rateLimiter  // nil = sem rate limiting
 }
 
-// New monta um Handler usando s como armazenamento e pool para agendar as
-// checagens assíncronas de saúde depois que um link é criado.
-func New(s store.Store, pool *worker.Pool) *Handler {
-	return &Handler{Store: &baseDeps{store: s, pool: pool}}
+// New monta um Handler. linkTTL define em quanto tempo um link expira (0 =
+// nunca) e rateLimitPerMin limita quantos links um mesmo IP pode criar por
+// minuto (0 ou negativo desliga o limite).
+func New(s store.Store, pool *worker.Pool, linkTTL time.Duration, rateLimitPerMin int) *Handler {
+	var limiter *rateLimiter
+	if rateLimitPerMin > 0 {
+		limiter = newRateLimiter(rateLimitPerMin, time.Minute)
+	}
+	return &Handler{Store: &baseDeps{store: s, pool: pool, ttl: linkTTL, limiter: limiter}}
 }
 
 // Routes monta o roteador com todas as rotas da aplicação: a API e o
@@ -40,7 +48,7 @@ func (h *Handler) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// API
-	mux.HandleFunc("POST /api/shorten", h.Shorten)
+	mux.Handle("POST /api/shorten", h.rateLimited(http.HandlerFunc(h.Shorten)))
 	mux.HandleFunc("GET /api/links", h.ListLinks)
 	mux.HandleFunc("GET /api/links/{code}", h.LinkStats)
 	mux.HandleFunc("GET /healthz", h.Healthz)
@@ -62,9 +70,11 @@ func (h *Handler) Routes() *http.ServeMux {
 	return mux
 }
 
-// shortenRequest é o corpo esperado no POST /api/shorten.
+// shortenRequest é o corpo esperado no POST /api/shorten. O alias é opcional:
+// se vier, vira o código curto; senão, um código aleatório é gerado.
 type shortenRequest struct {
-	URL string `json:"url"`
+	URL   string `json:"url"`
+	Alias string `json:"alias"`
 }
 
 // linkResponse é o formato usado pra devolver um link em JSON, tanto na
@@ -96,7 +106,25 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, err := h.Store.store.Create(req.URL)
+	// alias opcional: se o usuário mandou um, valido e tento criar com ele;
+	// senão, gero um código aleatório.
+	var (
+		link *store.Link
+		err  error
+	)
+	if alias := strings.TrimSpace(req.Alias); alias != "" {
+		if !isValidAlias(alias) {
+			writeError(w, http.StatusBadRequest, "alias inválido: use 3 a 32 caracteres (letras, números, - ou _) e não pode ser uma palavra reservada")
+			return
+		}
+		link, err = h.Store.store.CreateWithCode(alias, req.URL)
+		if errors.Is(err, store.ErrCodeTaken) {
+			writeError(w, http.StatusConflict, "esse alias já está em uso, escolha outro")
+			return
+		}
+	} else {
+		link, err = h.Store.store.Create(req.URL)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "não consegui criar o link")
 		return
@@ -125,6 +153,11 @@ func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.expired(link) {
+		writeError(w, http.StatusGone, "esse link expirou")
+		return
+	}
+
 	_ = h.Store.store.IncrementHits(code)
 	http.Redirect(w, r, link.Destination, http.StatusFound)
 }
@@ -144,15 +177,23 @@ func (h *Handler) LinkStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.expired(link) {
+		writeError(w, http.StatusGone, "esse link expirou")
+		return
+	}
+
 	writeJSON(w, http.StatusOK, toResponse(link, r))
 }
 
-// ListLinks trata o GET /api/links: devolve todos os links cadastrados.
-// É o endpoint que o painel visual usa pra montar a tabela na tela.
+// ListLinks trata o GET /api/links: devolve todos os links cadastrados
+// (menos os já expirados). É o endpoint que o painel usa pra montar a tabela.
 func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 	links := h.Store.store.All()
 	out := make([]linkResponse, 0, len(links))
 	for _, l := range links {
+		if h.expired(l) {
+			continue
+		}
 		out = append(out, toResponse(l, r))
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -272,6 +313,52 @@ func isValidURL(raw string) bool {
 		return false
 	}
 	return u.Scheme == "http" || u.Scheme == "https"
+}
+
+// expired diz se um link já passou do TTL configurado. Com ttl == 0 os links
+// nunca expiram.
+func (h *Handler) expired(link *store.Link) bool {
+	ttl := h.Store.ttl
+	return ttl > 0 && time.Since(link.CreatedAt) > ttl
+}
+
+// rateLimited envolve um handler com o rate limiter, quando ele está ligado.
+func (h *Handler) rateLimited(next http.Handler) http.Handler {
+	if h.Store.limiter == nil {
+		return next
+	}
+	return h.Store.limiter.middleware(next)
+}
+
+// reservedAliases são códigos que não podem virar alias porque colidiriam com
+// rotas fixas (elas têm prioridade no roteador e o link ficaria inacessível).
+// Os arquivos estáticos (style.css etc.) têm ponto, que o conjunto de
+// caracteres do isValidAlias já barra.
+var reservedAliases = map[string]bool{
+	"api":     true,
+	"healthz": true,
+}
+
+// isValidAlias valida um alias escolhido pelo usuário: 3 a 32 caracteres, só
+// letras, números, hífen ou underscore, e fora da lista de reservados.
+func isValidAlias(a string) bool {
+	if len(a) < 3 || len(a) > 32 {
+		return false
+	}
+	if reservedAliases[strings.ToLower(a)] {
+		return false
+	}
+	for _, r := range a {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // writeJSON serializa payload como JSON e escreve na resposta com o status

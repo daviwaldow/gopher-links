@@ -28,6 +28,10 @@ const (
 // ErrNotFound é devolvido quando o código curto não existe.
 var ErrNotFound = errors.New("store: link não encontrado")
 
+// ErrCodeTaken é devolvido quando alguém tenta criar um link com um código
+// (alias) que já existe.
+var ErrCodeTaken = errors.New("store: código já em uso")
+
 // Link representa um único link encurtado e os metadados dele.
 type Link struct {
 	Code        string
@@ -44,10 +48,12 @@ type Link struct {
 // verdade rodando.
 type Store interface {
 	Create(destination string) (*Link, error)
+	CreateWithCode(code, destination string) (*Link, error)
 	Get(code string) (*Link, error)
 	UpdateStatus(code string, status Status, checkedAt time.Time) error
 	IncrementHits(code string) error
 	All() []*Link
+	DeleteExpired(cutoff time.Time) (int, error)
 }
 
 // MemoryStore guarda tudo num map, protegido por um RWMutex, porque tanto os
@@ -100,6 +106,42 @@ func (s *MemoryStore) Create(destination string) (*Link, error) {
 	}
 	s.links[code] = link
 	return link, nil
+}
+
+// CreateWithCode cria um link usando um código específico (alias escolhido
+// pelo usuário). Se o código já existir, devolve ErrCodeTaken.
+func (s *MemoryStore) CreateWithCode(code, destination string) (*Link, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.links[code]; exists {
+		return nil, ErrCodeTaken
+	}
+
+	link := &Link{
+		Code:        code,
+		Destination: destination,
+		CreatedAt:   time.Now(),
+		Status:      StatusPending,
+	}
+	s.links[code] = link
+	return link, nil
+}
+
+// DeleteExpired remove todos os links criados antes de cutoff e devolve
+// quantos foram apagados. Usado pela rotina de limpeza de links antigos.
+func (s *MemoryStore) DeleteExpired(cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	n := 0
+	for code, link := range s.links {
+		if link.CreatedAt.Before(cutoff) {
+			delete(s.links, code)
+			n++
+		}
+	}
+	return n, nil
 }
 
 // randomCode sorteia uma string aleatória de codeLength caracteres a partir

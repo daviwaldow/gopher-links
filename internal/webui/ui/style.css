@@ -76,6 +76,11 @@ input[type="text"]:focus {
   border-color: var(--accent);
 }
 
+.alias-input {
+  margin-top: 10px;
+  width: 100%;
+}
+
 button {
   background: var(--accent);
   color: white;

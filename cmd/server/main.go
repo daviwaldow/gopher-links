@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -61,7 +62,18 @@ func run() error {
 	pool := worker.NewPool(s, numWorkers, jobQueueSize)
 	pool.Start(ctx)
 
-	h := handlers.New(s, pool)
+	// Config de expiração e rate limiting, via ambiente:
+	// - LINK_TTL_DAYS: links expiram após N dias (0/vazio = nunca).
+	// - RATE_LIMIT_PER_MIN: máximo de links que um IP cria por minuto (0 = sem limite).
+	linkTTL := time.Duration(envInt("LINK_TTL_DAYS", 0)) * 24 * time.Hour
+	rateLimitPerMin := envInt("RATE_LIMIT_PER_MIN", 30)
+
+	// se há TTL, sobe a rotina que apaga links expirados de tempos em tempos.
+	if linkTTL > 0 {
+		go runJanitor(ctx, s, linkTTL)
+	}
+
+	h := handlers.New(s, pool, linkTTL, rateLimitPerMin)
 
 	// Envolvo o roteador com o middleware de CORS pra que o frontend
 	// hospedado no Firebase (outro domínio) consiga chamar a API. As origens
@@ -113,4 +125,38 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// envInt lê uma variável de ambiente como inteiro; se estiver vazia ou não
+// for um número, devolve o valor padrão.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+// runJanitor roda em background e, a cada hora, apaga os links que já passaram
+// do TTL. Para quando o contexto é cancelado (shutdown).
+func runJanitor(ctx context.Context, s store.Store, ttl time.Duration) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := s.DeleteExpired(time.Now().Add(-ttl))
+			if err != nil {
+				log.Printf("limpeza de links expirados falhou: %v", err)
+				continue
+			}
+			if n > 0 {
+				log.Printf("limpeza: %d link(s) expirado(s) removido(s)", n)
+			}
+		}
+	}
 }
