@@ -1,0 +1,34 @@
+# Roda a cada push na main que mexe no frontend (pasta firebase/): publica
+# os arquivos estaticos no Firebase Hosting automaticamente. O frontend e
+# estatico (sem build), entao so precisa autenticar e rodar o deploy.
+#
+# Precisa do secret FIREBASE_SERVICE_ACCOUNT no repositorio (JSON da conta
+# de servico com permissao de Firebase Hosting Admin).
+name: Deploy - Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firebase/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch: {} # permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Autenticar no Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy no Firebase Hosting
+        working-directory: firebase
+        run: npx firebase-tools@latest deploy --only hosting --non-interactive --project gopherlinks

@@ -1,0 +1,27 @@
+# Roda em todo push e pull request na main: compila o backend Go e roda os
+# testes. Garante que nada quebra antes de subir. A versao do Go vem do
+# go.mod, entao fica sempre alinhada com o projeto.
+name: CI - Go
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Testes
+        run: go test ./...
