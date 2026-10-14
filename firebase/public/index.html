@@ -4,64 +4,72 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>gopher-links</title>
+  <meta name="description" content="Encurtador de links em Go com checagem de saude em tempo real." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>gopher-links</h1>
-      <p class="subtitle">encurtador de links em go. protótipo.</p>
+  <main class="wrap">
+    <header class="hero">
+      <div class="brand">
+        <svg class="logo" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="44" height="44" rx="12" fill="url(#lg)" />
+          <g transform="translate(10 10)" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </g>
+          <defs>
+            <linearGradient id="lg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#2DD4E6" />
+              <stop offset="1" stop-color="#0E7490" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="wordmark">gopher<span class="wordmark-accent">-links</span></span>
+      </div>
+      <p class="subtitle">Encurtador de links em Go, com checagem de saude em tempo real.</p>
     </header>
 
     <form id="shorten-form" class="card">
-      <label for="url-input">URL de destino</label>
-      <div class="form-row">
-        <input
-          id="url-input"
-          type="text"
-          placeholder="https://exemplo.com/pagina-bem-longa"
-          autocomplete="off"
-          required
-        />
-        <button type="submit">Encurtar</button>
-      </div>
       <input
-        id="alias-input"
-        class="alias-input"
-        type="text"
-        placeholder="alias personalizado (opcional)"
+        id="url-input"
+        class="input input-url"
+        type="url"
+        placeholder="Cole um link longo aqui"
         autocomplete="off"
+        required
       />
+      <div class="field-row">
+        <input
+          id="alias-input"
+          class="input input-alias"
+          type="text"
+          placeholder="alias personalizado (opcional)"
+          autocomplete="off"
+        />
+        <button type="submit" class="btn-primary">
+          <span class="btn-label">Encurtar</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </div>
       <p id="form-error" class="error hidden"></p>
     </form>
 
-    <section class="card">
-      <div class="section-header">
+    <section class="results">
+      <div class="results-head">
         <h2>Links criados</h2>
-        <span id="link-count" class="badge-count">0</span>
+        <span id="link-count" class="count">0</span>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Link curto</th>
-            <th>Destino</th>
-            <th>Status</th>
-            <th>Cliques</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="links-body">
-          <tr id="empty-row">
-            <td colspan="5" class="empty">nenhum link ainda.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div id="links-list" class="links-list"></div>
+      <p id="empty-state" class="empty">Nenhum link ainda. Cole um acima para comecar.</p>
     </section>
 
     <footer>
       <span id="conn-status" class="conn-status">conectando...</span>
     </footer>
-  </div>
+  </main>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

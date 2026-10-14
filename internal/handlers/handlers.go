@@ -260,7 +260,9 @@ func CORS(allowedOrigins string, next http.Handler) http.Handler {
 func SecurityHeaders(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; base-uri 'self'; object-src 'none'; " +
 		"frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; " +
-		"style-src 'self'; script-src 'self'; connect-src 'self'"
+		"style-src 'self' https://fonts.googleapis.com; " +
+		"font-src 'self' https://fonts.gstatic.com; " +
+		"script-src 'self'; connect-src 'self'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
